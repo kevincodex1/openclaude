@@ -140,6 +140,12 @@ export const getSystemContext = memoize(
 
     return {
       ...(gitStatus && { gitStatus }),
+      // currentDate lives in system context (not user context) so it lands
+      // after SYSTEM_PROMPT_DYNAMIC_BOUNDARY in the system prompt blocks and
+      // does not bust the cached message-history region when the date rolls
+      // over at midnight. Date-rollover within a session is also signaled
+      // separately via the date_change attachment in utils/attachments.ts.
+      currentDate: `Today's date is ${getLocalISODate()}.`,
       ...(feature('BREAK_CACHE_COMMAND') && injection
         ? {
             cacheBreaker: `[CACHE_BREAKER: ${injection}]`,
@@ -183,7 +189,6 @@ export const getUserContext = memoize(
 
     return {
       ...(claudeMd && { claudeMd }),
-      currentDate: `Today's date is ${getLocalISODate()}.`,
     }
   },
 )
