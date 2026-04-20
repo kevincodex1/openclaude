@@ -122,6 +122,18 @@ async function main(): Promise<void> {
     }
   }
 
+  // Zero-config autodetection: when the user has no explicit provider
+  // selection AND no persisted /provider profile, scan env credentials
+  // and local services for a usable provider. Applies only for env-var-
+  // based providers (anthropic/openai/gemini/github/mistral); codex /
+  // ollama / lm-studio etc. defer to the existing picker flow.
+  {
+    const { autoApplyProviderIfNeeded } = await import(
+      '../utils/providerAutoApply.js'
+    )
+    await autoApplyProviderIfNeeded({ processEnv: process.env })
+  }
+
   // Hydrate GitHub credentials after profile is applied so CLAUDE_CODE_USE_GITHUB from profile is available
   {
     const {
