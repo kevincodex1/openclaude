@@ -489,6 +489,58 @@ export async function getURLMarkdownContent(
   return entry
 }
 
+// Budget for the secondary-model summarization after fetch. If the small-
+// fast model is slow (e.g. a 200k-context third-party running a reasoning
+// pass over ~100KB of markdown), we'd rather fall back to raw truncated
+// markdown than hang the tool. Also keeps the worst-case WebFetch bounded
+// to FETCH_TIMEOUT_MS + SECONDARY_MODEL_TIMEOUT_MS regardless of provider.
+const SECONDARY_MODEL_TIMEOUT_MS = 45_000
+
+function raceWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  signal: AbortSignal,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const err = new Error(`Secondary-model summarization timed out after ${timeoutMs}ms`)
+      ;(err as NodeJS.ErrnoException).code = 'SECONDARY_MODEL_TIMEOUT'
+      reject(err)
+    }, timeoutMs)
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(new AbortError())
+    }
+    if (signal.aborted) {
+      clearTimeout(timer)
+      reject(new AbortError())
+      return
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(
+      value => {
+        clearTimeout(timer)
+        signal.removeEventListener('abort', onAbort)
+        resolve(value)
+      },
+      err => {
+        clearTimeout(timer)
+        signal.removeEventListener('abort', onAbort)
+        reject(err)
+      },
+    )
+  })
+}
+
+function buildFallbackMarkdownSummary(truncatedContent: string): string {
+  return [
+    '[Secondary-model summarization unavailable — returning raw fetched content.',
+    'This typically means the configured small-fast model took too long or errored.]',
+    '',
+    truncatedContent,
+  ].join('\n')
+}
+
 export async function applyPromptToMarkdown(
   prompt: string,
   markdownContent: string,
@@ -508,18 +560,35 @@ export async function applyPromptToMarkdown(
     prompt,
     isPreapprovedDomain,
   )
-  const assistantMessage = await queryHaiku({
-    systemPrompt: asSystemPrompt([]),
-    userPrompt: modelPrompt,
-    signal,
-    options: {
-      querySource: 'web_fetch_apply',
-      agents: [],
-      isNonInteractiveSession,
-      hasAppendSystemPrompt: false,
-      mcpTools: [],
-    },
-  })
+  let assistantMessage
+  try {
+    assistantMessage = await raceWithTimeout(
+      queryHaiku({
+        systemPrompt: asSystemPrompt([]),
+        userPrompt: modelPrompt,
+        signal,
+        options: {
+          querySource: 'web_fetch_apply',
+          agents: [],
+          isNonInteractiveSession,
+          hasAppendSystemPrompt: false,
+          mcpTools: [],
+        },
+      }),
+      SECONDARY_MODEL_TIMEOUT_MS,
+      signal,
+    )
+  } catch (err) {
+    // User interrupts and SIGINTs still propagate. Everything else (timeout,
+    // provider-side error, unsupported model on third-party endpoint) falls
+    // back to raw markdown so the user still gets usable content rather than
+    // a hang. Log so it's visible in debug traces.
+    if (err instanceof AbortError || (err as Error)?.name === 'AbortError') {
+      throw err
+    }
+    logError(err)
+    return buildFallbackMarkdownSummary(truncatedContent)
+  }
 
   // We need to bubble this up, so that the tool call throws, causing us to return
   // an is_error tool_use block to the server, and render a red dot in the UI.
@@ -534,5 +603,5 @@ export async function applyPromptToMarkdown(
       return contentBlock.text
     }
   }
-  return 'No response from model'
+  return buildFallbackMarkdownSummary(truncatedContent)
 }
