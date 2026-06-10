@@ -1295,7 +1295,9 @@ async function* queryModel(
         200000
       ),
     })
-    messagesForAPI = strategyResult.selectedMessages
+    // applyHybridStrategy is typed over the full Message union but only ever
+    // receives (and returns) the user/assistant subset passed in here.
+    messagesForAPI = strategyResult.selectedMessages as typeof messagesForAPI
   }
 
   // Model-specific post-processing: strip tool-search-specific fields if the
