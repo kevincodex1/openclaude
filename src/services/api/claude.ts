@@ -65,6 +65,8 @@ import {
 import { getOrCreateUserID } from '../../utils/config.js'
 import {
   CAPPED_DEFAULT_MAX_TOKENS,
+  COMPACT_MAX_OUTPUT_TOKENS,
+  getContextWindowForModel,
   getModelMaxOutputTokens,
   getSonnet1mExpTreatmentEnabled,
 } from '../../utils/context.js'
@@ -122,6 +124,7 @@ import {
   getPromptCache1hAllowlist,
   getPromptCache1hEligible,
   getSessionId,
+  getSdkBetas,
   getThinkingClearLatched,
   setAfkModeHeaderLatched,
   setCacheEditingHeaderLatched,
@@ -1288,7 +1291,7 @@ async function* queryModel(
       cacheWeight: 0.4,
       freshWeight: 0.6,
       maxTotalTokens: Math.min(
-        getContextWindowForModel(model, getSdkBetas()) - COMPACT_MAX_OUTPUT_TOKENS,
+        getContextWindowForModel(options.model, getSdkBetas()) - COMPACT_MAX_OUTPUT_TOKENS,
         200000
       ),
     })
