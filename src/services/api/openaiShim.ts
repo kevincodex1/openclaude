@@ -1061,12 +1061,13 @@ async function* anthropicSsePassthrough(
   let buffer = ''
 
   // Read helper that properly cleans up abort listeners (mirrors codexShim.ts pattern).
-  function readWithAbort(): Promise<ReadableStreamReadResult<Uint8Array>> {
-    if (!signal) return reader.read()
+  function readWithAbort(): Promise<Bun.ReadableStreamDefaultReadResult<Uint8Array<ArrayBuffer>>> {
+    // reader is guarded non-null above; hoisted function escapes TS narrowing.
+    if (!signal) return reader!.read()
     return new Promise((resolve, reject) => {
       const onAbort = () => reject(new DOMException('Aborted', 'AbortError'))
       signal.addEventListener('abort', onAbort, { once: true })
-      reader.read().then(
+      reader!.read().then(
         result => { signal.removeEventListener('abort', onAbort); resolve(result) },
         err => { signal.removeEventListener('abort', onAbort); reject(err) },
       )
@@ -1128,12 +1129,13 @@ async function* geminiSseToAnthropic(
   let usage: Partial<AnthropicUsage> | undefined
   let finishReason: string | undefined
 
-  function readWithAbort(): Promise<ReadableStreamReadResult<Uint8Array>> {
-    if (!signal) return reader.read()
+  function readWithAbort(): Promise<Bun.ReadableStreamDefaultReadResult<Uint8Array<ArrayBuffer>>> {
+    // reader is guarded non-null above; hoisted function escapes TS narrowing.
+    if (!signal) return reader!.read()
     return new Promise((resolve, reject) => {
       const onAbort = () => reject(new DOMException('Aborted', 'AbortError'))
       signal.addEventListener('abort', onAbort, { once: true })
-      reader.read().then(
+      reader!.read().then(
         result => { signal.removeEventListener('abort', onAbort); resolve(result) },
         err => { signal.removeEventListener('abort', onAbort); reject(err) },
       )
@@ -1348,7 +1350,7 @@ async function* openaiStreamToAnthropic(
    * Respects the caller's AbortSignal — clears the idle timer on abort
    * so the rejection reason is AbortError, not a spurious idle timeout.
    */
-  async function readWithTimeout(): Promise<ReadableStreamReadResult<Uint8Array>> {
+  async function readWithTimeout(): Promise<Bun.ReadableStreamDefaultReadResult<Uint8Array<ArrayBuffer>>> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         const elapsed = Math.round((Date.now() - lastDataTime) / 1000)
@@ -1367,7 +1369,8 @@ async function* openaiStreamToAnthropic(
         signal.addEventListener('abort', abortCleanup, { once: true })
       }
 
-      reader.read().then(
+      // reader is guarded non-null above; hoisted function escapes TS narrowing.
+      reader!.read().then(
         result => {
           clearTimeout(timeoutId)
           if (signal && abortCleanup) signal.removeEventListener('abort', abortCleanup)
@@ -2706,10 +2709,17 @@ class OpenAIShimMessages {
       : 0
     const maxAttempts = (isGithub ? GITHUB_429_MAX_RETRIES : 1) + maxSelfHealAttempts
 
-    const throwClassifiedTransportError = (
+    // WHY the explicit annotation on the const: TS only honors a `never`
+    // return for control-flow analysis (unreachable-after-call) when the
+    // referenced declaration itself has an explicit type annotation.
+    const throwClassifiedTransportError: (
       error: unknown,
       requestUrl: string,
       preclassifiedFailure?: ReturnType<typeof classifyOpenAINetworkFailure>,
+    ) => never = (
+      error,
+      requestUrl,
+      preclassifiedFailure,
     ): never => {
       if (options?.signal?.aborted) {
         throw error

@@ -6,7 +6,6 @@ import {
 } from '../test/sharedMutationLock.js'
 
 async function loadProviderDiscoveryModule() {
-  // @ts-expect-error cache-busting query string for Bun module mocks
   return import(`./providerDiscovery.js?ts=${Date.now()}-${Math.random()}`)
 }
 
