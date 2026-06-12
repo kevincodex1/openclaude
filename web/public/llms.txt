@@ -1,0 +1,28 @@
+# openclaude
+
+> Open-source coding agent that runs in your terminal and talks to any model:
+> OpenAI-compatible APIs, Google Gemini, GitHub Models, local Ollama, and
+> gateways like OpenRouter and LiteLLM. One install, every provider.
+> Maintained by GitLawb. Install: `npm install -g @gitlawb/openclaude@latest`
+
+openclaude reads and edits files, runs shell commands, searches codebases, and
+talks to MCP servers — permission-gated, with every change reviewable. It is
+a fork-friendly, model-neutral alternative to single-vendor coding agents.
+
+## Docs
+
+- [Documentation overview](https://openclaude.gitlawb.com/docs/): what openclaude is and how the docs are organized
+- [Installation](https://openclaude.gitlawb.com/docs/installation/): npm install on macOS, Linux, Windows; AUR package; troubleshooting
+- [Quickstart](https://openclaude.gitlawb.com/docs/quickstart/): first session in five minutes — start, pick a provider, task, review
+- [Providers](https://openclaude.gitlawb.com/docs/providers/): all 14 supported backends with setup paths and env vars
+- [Slash commands reference](https://openclaude.gitlawb.com/docs/slash-commands/): all 69 in-session commands with argument hints
+- [CLI reference](https://openclaude.gitlawb.com/docs/cli-reference/): every flag of the openclaude binary, plus subcommands
+- [Configuration](https://openclaude.gitlawb.com/docs/configuration/): settings.json hierarchy, common options, environment variables
+- [Keybindings](https://openclaude.gitlawb.com/docs/keybindings/): default shortcuts and ~/.claude/keybindings.json customization
+- [Skills](https://openclaude.gitlawb.com/docs/skills/): bundled agent skills and how to write your own
+
+## Project
+
+- [GitHub repository](https://github.com/Gitlawb/openclaude): source, issues, releases
+- [npm package](https://www.npmjs.com/package/@gitlawb/openclaude): @gitlawb/openclaude
+- [gitlawb](https://gitlawb.com): the decentralized git network openclaude is aligned with
