@@ -252,6 +252,14 @@ export type GlobalConfig = {
   lastOnboardingVersion?: string
   // Tracks the last version for which release notes were seen, used for managing release notes
   lastReleaseNotesSeen?: string
+  // Latest version seen on the registry during the last update check. Persisted
+  // so the "update available" startup notice can render instantly (no network on
+  // the render path), reflecting the previous check like update-notifier.
+  lastKnownLatestVersion?: string
+  // Set true when an auto-update attempt failed or lacked permissions; used to
+  // surface the "update available" notice for users who must update manually.
+  // Cleared on a successful update.
+  autoUpdateFailed?: boolean
   // Timestamp when changelog was last fetched (content stored in ~/.claude/cache/changelog.md)
   changelogLastFetched?: number
   // @deprecated - Migrated to ~/.claude/cache/changelog.md. Keep for migration support.

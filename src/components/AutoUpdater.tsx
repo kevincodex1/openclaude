@@ -5,7 +5,7 @@ import { useInterval } from 'usehooks-ts';
 import { useUpdateNotification } from '../hooks/useUpdateNotification.js';
 import { Box, Text } from '../ink.js';
 import { type AutoUpdaterResult, getLatestVersion, getMaxVersion, type InstallStatus, installGlobalPackage, shouldSkipVersion } from '../utils/autoUpdater.js';
-import { getGlobalConfig, isAutoUpdaterDisabled } from '../utils/config.js';
+import { getGlobalConfig, isAutoUpdaterDisabled, saveGlobalConfig } from '../utils/config.js';
 import { logForDebugging } from '../utils/debug.js';
 import { getCurrentInstallationType } from '../utils/doctorDiagnostic.js';
 import { installOrUpdateClaudePackage, localInstallationExists } from '../utils/localInstaller.js';
@@ -130,6 +130,18 @@ export function AutoUpdater({
         }
       }
       onChangeIsUpdating(false);
+      // Track failure so the "update available" startup notice can prompt users
+      // to update manually when auto-update couldn't apply the new version.
+      try {
+        const failed = installStatus !== 'success';
+        saveGlobalConfig(current =>
+          (current.autoUpdateFailed ?? false) === failed ? current : {
+            ...current,
+            autoUpdateFailed: failed
+          });
+      } catch (error) {
+        logForDebugging(`AutoUpdater: failed to persist autoUpdateFailed: ${error}`);
+      }
       if (installStatus === 'success') {
         logEvent('tengu_auto_updater_success', {
           fromVersion: currentVersion as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,

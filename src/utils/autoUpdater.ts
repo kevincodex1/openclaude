@@ -347,6 +347,24 @@ export async function checkGlobalInstallPermissions(): Promise<{
   }
 }
 
+/**
+ * Cache the latest version seen on the registry into the global config so the
+ * "update available" startup notice can render it instantly on the next launch
+ * without touching the network on the render path (the update-notifier pattern).
+ * Best-effort: a failed write must never break the update check.
+ */
+function persistLastKnownLatestVersion(version: string): void {
+  try {
+    saveGlobalConfig(current =>
+      current.lastKnownLatestVersion === version
+        ? current
+        : { ...current, lastKnownLatestVersion: version },
+    )
+  } catch (error) {
+    logForDebugging(`Failed to persist lastKnownLatestVersion: ${error}`)
+  }
+}
+
 export async function getLatestVersion(
   channel: ReleaseChannel,
 ): Promise<string | null> {
@@ -361,6 +379,7 @@ export async function getLatestVersion(
       { abortSignal, cwd: homedir() },
     ),
   )
+  let version: string | null
   if (result.code !== 0) {
     logForDebugging(`npm view failed with code ${result.code}`)
     if (result.stderr) {
@@ -374,9 +393,14 @@ export async function getLatestVersion(
     // npm may be unavailable (bun/pnpm/yarn-only installs) or transiently
     // failing — fall back to a direct registry request so update checks still
     // work without npm on the PATH.
-    return getLatestVersionFromRegistryHttp(npmTag)
+    version = await getLatestVersionFromRegistryHttp(npmTag)
+  } else {
+    version = result.stdout.trim()
   }
-  return result.stdout.trim()
+  if (version) {
+    persistLastKnownLatestVersion(version)
+  }
+  return version
 }
 
 /**

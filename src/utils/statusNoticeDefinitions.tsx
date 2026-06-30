@@ -6,7 +6,9 @@ import figures from 'figures';
 import { getCwd } from './cwd.js';
 import { relative } from 'path';
 import { formatNumber } from './format.js';
-import type { getGlobalConfig } from './config.js';
+import { type getGlobalConfig, isAutoUpdaterDisabled } from './config.js';
+import { gt } from './semver.js';
+import { OPENCLAUDE_RELEASES_URL } from './version.js';
 import { getAnthropicApiKeyWithSource, getApiKeyFromConfigOrMacOSKeychain, getAuthTokenSource, isClaudeAISubscriber } from './auth.js';
 import type { AgentDefinitionsResult } from '../tools/AgentTool/loadAgentsDir.js';
 import { getAgentDescriptionsTotalTokens, AGENT_DESCRIPTIONS_THRESHOLD } from './statusNoticeHelpers.js';
@@ -311,8 +313,64 @@ const dangerouslySkipPermissionsNotice: StatusNoticeDefinition = {
     </WarningNoticeRow>
 };
 
+// Shows a prominent box below the logo when a newer version exists AND the
+// user must update manually — i.e. auto-update is disabled, or the last
+// auto-update attempt failed. When auto-update is enabled and healthy it stays
+// hidden, since the prompt-input footer already reports "Update installed ·
+// Restart to apply". The latest version is read from config (persisted by the
+// last update check), so there is no network call on the render path.
+const updateAvailableNotice: StatusNoticeDefinition = {
+  id: 'update-available',
+  type: 'info',
+  isActive: ctx => {
+    const latest = ctx.config.lastKnownLatestVersion;
+    if (!latest) {
+      return false;
+    }
+    let isNewer: boolean;
+    try {
+      // Dev builds report MACRO.VERSION as a sentinel (99.0.0), so gt() is
+      // false and the notice stays hidden during local development. The
+      // try/catch also guards a malformed/undefined version.
+      isNewer = gt(latest, MACRO.VERSION);
+    } catch {
+      return false;
+    }
+    if (!isNewer) {
+      return false;
+    }
+    // Only nag when the user actually has to act.
+    return isAutoUpdaterDisabled() || ctx.config.autoUpdateFailed === true;
+  },
+  render: ctx => {
+    const latest = ctx.config.lastKnownLatestVersion;
+    if (!latest) {
+      return null;
+    }
+    const current = MACRO.DISPLAY_VERSION ?? MACRO.VERSION;
+    const updateCommand =
+      ctx.config.installMethod === 'local'
+        ? `cd ~/.openclaude/local && npm update ${MACRO.PACKAGE_URL}`
+        : `npm install -g ${MACRO.PACKAGE_URL}@latest`;
+    return <Box flexDirection="column" borderStyle="round" borderColor="claude" paddingX={1} marginTop={1}>
+        <Text>
+          <Text color="claude">✨ Update available!</Text>{' '}
+          <Text bold>{current}</Text> {figures.arrowRight}{' '}
+          <Text bold color="claude">{latest}</Text>
+        </Text>
+        <Text>
+          Run <Text bold>{updateCommand}</Text> to update.
+        </Text>
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>See full release notes:</Text>
+          <Text color="text">{OPENCLAUDE_RELEASES_URL}/latest</Text>
+        </Box>
+      </Box>;
+  }
+};
+
 // All notice definitions
-export const statusNoticeDefinitions: StatusNoticeDefinition[] = [largeMemoryFilesNotice, largeAgentDescriptionsNotice, localModelContextLoadNotice, claudeAiSubscriberExternalTokenNotice, apiKeyConflictNotice, bothAuthMethodsNotice, jetbrainsPluginNotice, thirdPartyPermissiveModeNotice, dangerouslySkipPermissionsNotice];
+export const statusNoticeDefinitions: StatusNoticeDefinition[] = [updateAvailableNotice, largeMemoryFilesNotice, largeAgentDescriptionsNotice, localModelContextLoadNotice, claudeAiSubscriberExternalTokenNotice, apiKeyConflictNotice, bothAuthMethodsNotice, jetbrainsPluginNotice, thirdPartyPermissiveModeNotice, dangerouslySkipPermissionsNotice];
 
 // Helper functions for external use
 export function getActiveNotices(context: StatusNoticeContext): StatusNoticeDefinition[] {
